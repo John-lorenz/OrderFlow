@@ -1,0 +1,9 @@
+**/.vs
+**/.idea
+**/bin
+**/obj
+**/node_modules
+**/TestResults
+**/.git
+frontend/dist
+logs

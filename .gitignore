@@ -1,0 +1,40 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.nupkg
+project.lock.json
+artifacts/
+
+## Secrets
+appsettings.*.local.json
+*.pfx
+secrets.json
+
+## Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+## IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+## Logs
+logs/
+*.log
+
+## Test
+TestResults/
+coverage/

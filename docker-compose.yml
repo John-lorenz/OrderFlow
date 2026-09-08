@@ -1,0 +1,34 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: orderflow-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "OrderFlow_Dev_123"
+    ports:
+      - "1433:1433"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/OrderFlow.Api/Dockerfile
+    container_name: orderflow-api
+    restart: on-failure
+    depends_on:
+      - sqlserver
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Server=sqlserver,1433;Database=OrderFlow;User Id=sa;Password=OrderFlow_Dev_123;TrustServerCertificate=True;MultipleActiveResultSets=True
+      Jwt__Secret: CHANGE_ME_super_secret_orderflow_dev_key_32chars
+    ports:
+      - "5088:8080"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: orderflow-web
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
