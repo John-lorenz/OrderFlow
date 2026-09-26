@@ -1,11 +1,11 @@
 # OrderFlow
 
-Production-oriented order management system: **.NET 8 API** (Clean Architecture, DDD, CQRS/MediatR) plus a **React + TypeScript** operations UI.
+Production-oriented order management: **.NET 8 API** (Clean Architecture, DDD, CQRS/MediatR) plus a **React + TypeScript** operations UI.
 
 The domain enforces a strict order lifecycle:
 
 `Draft → Confirmed → Paid → Shipped → Completed`  
-Cancellable from `Draft`, `Confirmed`, or `Paid`. Stock is reserved on confirm and released on cancel.
+Cancellable from `Draft`, `Confirmed`, or `Paid`. Stock is reserved on confirm and released on cancel. Domain events are dispatched in-process after each successful commit.
 
 ## Architecture
 
@@ -23,11 +23,11 @@ tests                         xUnit + Moq + FluentAssertions + WebApplicationFac
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /api/auth/login`, `register`, `refresh`, `revoke`, `GET /api/auth/me` |
-| Orders | CRUD draft + `confirm` / `pay` / `ship` / `complete` / `cancel` |
+| Orders | Draft CRUD + `confirm` / `pay` / `ship` / `complete` / `cancel` |
 | Catalog | Customers and products (Admin/Manager write) |
 | Dashboard | `GET /api/dashboard` |
 
-JWT access tokens expire in 15 minutes. Refresh tokens are stored as SHA-256 hashes and rotated.
+JWT access tokens expire in 15 minutes. Refresh tokens are stored as SHA-256 hashes and rotated. The UI refreshes the session automatically.
 
 ### Seed users
 
@@ -39,34 +39,22 @@ JWT access tokens expire in 15 minutes. Refresh tokens are stored as SHA-256 has
 
 ## Local run
 
-SQL Server must be reachable at `localhost,1433` (Docker Compose provides this).
-
-```bash
-docker compose up sqlserver -d
-dotnet ef database update --project src/OrderFlow.Infrastructure --startup-project src/OrderFlow.Api
-dotnet run --project src/OrderFlow.Api
-```
-
-Swagger: http://localhost:5088/swagger
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-UI: http://localhost:5173
-
-Or the full stack:
-
 ```bash
 docker compose up --build
 ```
 
-- API: http://localhost:5088/swagger
+- API / Swagger: http://localhost:5088/swagger
 - Web: http://localhost:5173
+
+Without Docker for the UI (API still needs SQL Server on `localhost,1433`):
+
+```bash
+docker compose up sqlserver -d
+dotnet run --project src/OrderFlow.Api
+cd frontend && npm install && npm run dev
+```
+
+Migrations run automatically on API startup.
 
 ## Tests
 
@@ -74,14 +62,14 @@ docker compose up --build
 dotnet test
 ```
 
-## Azure / CI
+## CI / Azure
 
-GitHub Actions builds and tests on every push to `main`. Deployment to Azure App Service runs when these repository secrets exist:
+GitHub Actions builds and tests the API and frontend on every push to `main`.
 
-- `AZURE_WEBAPP_NAME`
-- `AZURE_WEBAPP_PUBLISH_PROFILE`
+Azure App Service deploy is **manual**: run the `CI` workflow with `workflow_dispatch` after configuring:
 
-Configure the App Service connection string `DefaultConnection` and `Jwt__Secret` in Azure Configuration.
+- GitHub secrets: `AZURE_WEBAPP_NAME`, `AZURE_WEBAPP_PUBLISH_PROFILE`
+- App Service settings: `ConnectionStrings__DefaultConnection`, `Jwt__Secret`
 
 ## Security notes
 

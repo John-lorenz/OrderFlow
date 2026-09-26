@@ -35,8 +35,11 @@ export type Customer = {
   email: string;
   document: string;
   phone?: string;
+  street: string;
   city: string;
   state: string;
+  postalCode: string;
+  country: string;
   isActive: boolean;
 };
 
@@ -92,8 +95,52 @@ export function setAuth(auth: AuthResponse | null) {
   localStorage.setItem(TOKEN_KEY, JSON.stringify(auth));
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const auth = getAuth();
+function isExpiringSoon(auth: AuthResponse) {
+  const expires = Date.parse(auth.accessTokenExpiresAtUtc);
+  return Number.isNaN(expires) || expires - Date.now() < 60_000;
+}
+
+let refreshInFlight: Promise<AuthResponse | null> | null = null;
+
+async function refreshSession(): Promise<AuthResponse | null> {
+  const current = getAuth();
+  if (!current?.refreshToken) {
+    return null;
+  }
+
+  if (!refreshInFlight) {
+    refreshInFlight = fetch("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: current.refreshToken })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          setAuth(null);
+          return null;
+        }
+        const next = (await response.json()) as AuthResponse;
+        setAuth(next);
+        return next;
+      })
+      .catch(() => {
+        setAuth(null);
+        return null;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+
+  return refreshInFlight;
+}
+
+async function request<T>(path: string, init?: RequestInit, retry = true): Promise<T> {
+  let auth = getAuth();
+  if (auth && isExpiringSoon(auth)) {
+    auth = (await refreshSession()) ?? auth;
+  }
+
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
   if (auth?.accessToken) {
@@ -101,6 +148,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const response = await fetch(path, { ...init, headers });
+  if (response.status === 401 && retry && getAuth()?.refreshToken) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      return request<T>(path, init, false);
+    }
+  }
+
   if (response.status === 204) {
     return undefined as T;
   }
@@ -128,6 +182,10 @@ export const api = {
   complete: (id: string) => request<Order>(`/api/orders/${id}/complete`, { method: "POST" }),
   cancel: (id: string, reason: string) =>
     request<Order>(`/api/orders/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }),
-  products: () => request<Paged<Product>>("/api/products?pageSize=50&activeOnly=true"),
-  customers: () => request<Paged<Customer>>("/api/customers?pageSize=50&activeOnly=true")
+  products: (activeOnly = true) =>
+    request<Paged<Product>>(`/api/products?pageSize=50${activeOnly ? "&activeOnly=true" : ""}`),
+  createProduct: (body: unknown) => request<Product>("/api/products", { method: "POST", body: JSON.stringify(body) }),
+  customers: (activeOnly = true) =>
+    request<Paged<Customer>>(`/api/customers?pageSize=50${activeOnly ? "&activeOnly=true" : ""}`),
+  createCustomer: (body: unknown) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(body) })
 };

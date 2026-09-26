@@ -56,6 +56,8 @@ function LoginPage({ onLogin }: { onLogin: (auth: AuthResponse) => void }) {
 }
 
 function Shell({ auth, onLogout }: { auth: AuthResponse; onLogout: () => void }) {
+  const canWriteCatalog = auth.role === "Admin" || auth.role === "Manager";
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -64,6 +66,8 @@ function Shell({ auth, onLogout }: { auth: AuthResponse; onLogout: () => void })
           <NavLink to="/" end>Dashboard</NavLink>
           <NavLink to="/orders">Orders</NavLink>
           <NavLink to="/orders/new">New order</NavLink>
+          <NavLink to="/products">Products</NavLink>
+          <NavLink to="/customers">Customers</NavLink>
         </nav>
         <div style={{ marginTop: "auto", paddingTop: 24 }} className="muted">
           <div>{auth.fullName}</div>
@@ -77,6 +81,8 @@ function Shell({ auth, onLogout }: { auth: AuthResponse; onLogout: () => void })
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/new" element={<NewOrderPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
+          <Route path="/products" element={<ProductsPage canWrite={canWriteCatalog} />} />
+          <Route path="/customers" element={<CustomersPage canWrite={canWriteCatalog} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -332,6 +338,176 @@ function OrderDetailPage() {
                 <td>{h.toStatus}</td>
                 <td>{new Date(h.changedAtUtc).toLocaleString("pt-BR")}</td>
                 <td>{h.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function ProductsPage({ canWrite }: { canWrite: boolean }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [error, setError] = useState("");
+  const [sku, setSku] = useState("");
+  const [name, setName] = useState("");
+  const [unitPrice, setUnitPrice] = useState(100);
+  const [stockQuantity, setStockQuantity] = useState(10);
+
+  async function reload() {
+    setProducts((await api.products(false)).items);
+  }
+
+  useEffect(() => {
+    reload().catch((err) => setError(err.message));
+  }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api.createProduct({ sku, name, unitPrice, stockQuantity });
+      setSku("");
+      setName("");
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create product");
+    }
+  }
+
+  return (
+    <>
+      <div className="topbar"><h2>Products</h2></div>
+      {canWrite ? (
+        <form className="panel" onSubmit={submit}>
+          <div className="form-grid">
+            <div>
+              <label>SKU</label>
+              <input value={sku} onChange={(e) => setSku(e.target.value)} required />
+            </div>
+            <div>
+              <label>Name</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div>
+              <label>Unit price</label>
+              <input type="number" min={0.01} step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(Number(e.target.value))} />
+            </div>
+            <div>
+              <label>Stock</label>
+              <input type="number" min={0} value={stockQuantity} onChange={(e) => setStockQuantity(Number(e.target.value))} />
+            </div>
+          </div>
+          <div style={{ marginTop: 16 }}><button className="btn">Add product</button></div>
+        </form>
+      ) : <p className="muted">Operator can view the catalog. Admin/Manager can add items.</p>}
+      {error ? <p className="error">{error}</p> : null}
+      <div className="panel">
+        <table className="table">
+          <thead><tr><th>SKU</th><th>Name</th><th>Price</th><th>Stock</th></tr></thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id}>
+                <td>{product.sku}</td>
+                <td>{product.name}</td>
+                <td>{money(product.unitPrice)}</td>
+                <td>{product.stockQuantity}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function CustomersPage({ canWrite }: { canWrite: boolean }) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [error, setError] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [document, setDocument] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("Navegantes");
+  const [state, setState] = useState("SC");
+
+  async function reload() {
+    setCustomers((await api.customers(false)).items);
+  }
+
+  useEffect(() => {
+    reload().catch((err) => setError(err.message));
+  }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api.createCustomer({
+        name,
+        email,
+        document,
+        street,
+        city,
+        state,
+        postalCode: "88370-000",
+        country: "BR"
+      });
+      setName("");
+      setEmail("");
+      setDocument("");
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create customer");
+    }
+  }
+
+  return (
+    <>
+      <div className="topbar"><h2>Customers</h2></div>
+      {canWrite ? (
+        <form className="panel" onSubmit={submit}>
+          <div className="form-grid">
+            <div>
+              <label>Name</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div>
+              <label>Email</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div>
+              <label>Document</label>
+              <input value={document} onChange={(e) => setDocument(e.target.value)} required />
+            </div>
+            <div>
+              <label>Street</label>
+              <input value={street} onChange={(e) => setStreet(e.target.value)} required />
+            </div>
+            <div>
+              <label>City</label>
+              <input value={city} onChange={(e) => setCity(e.target.value)} required />
+            </div>
+            <div>
+              <label>State</label>
+              <input value={state} onChange={(e) => setState(e.target.value)} required />
+            </div>
+          </div>
+          <div style={{ marginTop: 16 }}><button className="btn">Add customer</button></div>
+        </form>
+      ) : null}
+      {error ? <p className="error">{error}</p> : null}
+      <div className="panel">
+        <table className="table">
+          <thead><tr><th>Name</th><th>Document</th><th>City</th><th>Email</th></tr></thead>
+          <tbody>
+            {customers.map((customer) => (
+              <tr key={customer.id}>
+                <td>{customer.name}</td>
+                <td>{customer.document}</td>
+                <td>{customer.city}</td>
+                <td>{customer.email}</td>
               </tr>
             ))}
           </tbody>

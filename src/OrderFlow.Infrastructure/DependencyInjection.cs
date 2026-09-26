@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderFlow.Application.Abstractions;
 using OrderFlow.Domain.Repositories;
+using OrderFlow.Infrastructure.Events;
 using OrderFlow.Infrastructure.Persistence;
 using OrderFlow.Infrastructure.Persistence.Repositories;
 using OrderFlow.Infrastructure.Security;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddDbContext<OrderFlowDbContext>(options =>
             options.UseSqlServer(connectionString));
 
+        services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
